@@ -1,0 +1,11 @@
+{
+  "name": "xively-data-loader",
+  "version": "1.0.0",
+  "description": "Load data into a xively account given configuration options",
+  "main": "index.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "Gavin Berkowitz",
+  "license": "ISC"
+}
