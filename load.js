@@ -8,14 +8,16 @@ var config = require('./config.js');
 
 //TODO p3: var goConfigure = function(){};
 
-var createDevicesFromTemplate = function(config){
+/*
+    Process idea: create orgs first and save ids. Use ratio of orgs:devices:users to associate while creating
+    devices + users. I believe when upTo % ratio = 0, pop the next orgId off the array. Will become more complex
+    to do nested orgs, but not much I think.
+*/
+
+var createXivelyObject = function(config,bodyFn){
     for(var upTo in config.asManyAsINeed){
+        var body = bodyFn();
         manage.post(function(req,res){
-            var body = {
-                "accountId": config.accountId,
-                "deviceTemplateId": config.deviceTemplateId,
-                ""
-            }
         });
     }
 }
