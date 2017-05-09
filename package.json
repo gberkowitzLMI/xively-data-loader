@@ -9,6 +9,7 @@
   "author": "Gavin Berkowitz",
   "license": "ISC",
   "dependencies": {
+    "async": "^2.4.0",
     "faker": "^4.1.0",
     "request": "^2.81.0"
   }

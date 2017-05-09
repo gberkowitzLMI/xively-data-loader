@@ -1,4 +1,5 @@
 var request = require('request');
+var async = require('async');
 var manage = request.defaults({baseUrl: "https://blueprint.xively.com:443/api/v1/", json:true});
 var config = require('./config.js');
 var accountId = config.accountId;
@@ -13,15 +14,14 @@ var authToken;
     to do nested orgs, but not much I think. Probably only works for ratio > 1.
 */
 
-var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn,callback){
+var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn,terminator){
     var upTo = 0;
     while(++upTo <= objectConfig.asManyAsINeed){ // <-- Pretty sure I heard that prepended incrementors are the sign of a maniac
         var body = createBodyFn(objectConfig, upTo);
         manage.post({url:objectConfig.postURL,headers:{'authorization': authToken}, body:body}, function(err, data){
-            if(typeof processResponseFn === "function") processResponseFn(data.body);
+            if(typeof processResponseFn === "function") processResponseFn(objectConfig, data.body,upTo,terminator);
         });
     }
-    callback(); //oy
 }
 
 
@@ -41,11 +41,9 @@ var createUserBody = function(userConfig,upTo){
 }
 
 var createDeviceBody = function(deviceConfig,upTo){
-    var group = linkToGroupSimple(upTo);
-    console.log(group);
     return {
         "accountId":accountId,
-        "organizationId": group,
+        "organizationId": linkToGroupSimple(upTo),
         "serialNumber": createIncrementingName(deviceConfig.namePrefix, upTo),
         "deviceTemplateId": deviceConfig.templateId,
         "latitude": faker.address.latitude(),
@@ -63,9 +61,17 @@ var createGroupBody = function(groupConfig, upTo){
 
 
 /* Response Processors */
-var processGroupResponse = function(groupResponse){
+var processGroupResponse = function(groupConfig, groupResponse, upTo, terminator){
     //Do some error processing
     groups.push(groupResponse.organization.id);
+    if(upTo >= groupConfig.asManyAsINeed)
+        terminator();
+
+}
+
+var processDeviceResponse = function(deviceConfig,deviceResponse, upTo, terminator){
+    if(upTo >= deviceConfig.asManyAsINeed)
+        terminator();
 }
 
 /* Additional Helper Functions */
@@ -73,7 +79,7 @@ var createIncrementingName = function(namePrefix, num){
     return namePrefix + num;
 }
 
-var doLogin = function(username,password, callback){
+var doLogin = function(username,password, terminator){
     var body = {
         "emailAddress":credentials.username,
         "password":credentials.password,
@@ -81,7 +87,7 @@ var doLogin = function(username,password, callback){
     }
     request.post({url:"https://id.xively.com/api/v1/auth/login-user",body:body, json:true},function(err,data){
         authToken = "Bearer " + data.body.jwt;
-        callback();
+        terminator();
     });
 }
 
@@ -91,13 +97,22 @@ var linkToGroupSimple = function(upTo){
 
 /* Actual Process */
 var run = function(){
-    doLogin(credentials.username,credentials.password,function(){ //There's GOT to be a better way!
-        createXivelyObject(config.groups,createGroupBody,processGroupResponse,function(){
-            createXivelyObject(config.devices,createDeviceBody,null,function(){
-                createXivelyObject(config.users,createUserBody,null,function(){}); //yes I know
-            });
-        });
-    }); 
+    async.series([
+        function(callback){
+            doLogin(credentials.username,credentials.password,callback);
+
+        },
+        function(callback){
+            createXivelyObject(config.groups, createGroupBody, processGroupResponse, callback);
+        },
+        function(callback){
+            createXivelyObject(config.devices,createDeviceBody, processDeviceResponse, callback);
+        },
+        function(callback){
+            createXivelyObject(config.users,createUserBody);
+        }
+        
+    ]);
 }
 
 run();
