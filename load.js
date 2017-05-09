@@ -13,7 +13,7 @@ var JWT;
     to do nested orgs, but not much I think. Probably only works for ratio > 1.
 */
 
-var createXivelyObject = function(accountId,objectConfig,createBodyFn,processResponseFn){
+var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn){
     for(var upTo in config.asManyAsINeed){
         var body = createBodyFn(objectConfig, upTo);
         manage.post(config.postURL,function(req,res){
@@ -61,7 +61,8 @@ var createGroupBody = function(groupConfig, upTo){
 
 /* Response Processors */
 var processGroupResponse = function(groupResponse){
-
+    //Do some error processing
+    groups.push(groupResponse.body.id);
 }
 
 /* Additional Helper Functions */
@@ -69,19 +70,36 @@ var createIncrementingName = function(namePrefix, num){
     return namePrefix + num;
 }
 
-var login = function(username,password){
-    
+var doLogin = function(username,password){
+    var body = {
+        "emailAddress":credentials.username,
+        "password":credentials.password,
+        "accountId":accountId
+    }
+    request.post("https://id.xively.com/api/v1/auth/login-user",body,function(req,res){
+        manage.defaults({headers: {'Authorization':"Bearer " +  res.body.jwt}}); 
+    });
 }
+
+/* Actual Process */
+var run = function(){
+    doLogin(credentials.username,credentials.password); //It's been too long, can I count on this to be synchronous?
+    createXivelyObject(config.groups,createGroupBody,processGroupResponse);
+    createXivelyObject(config.devices,createDeviceBody);
+    createXivelyObject(config.users,createUserBody);
+}
+
+run();
 
 
 /* TODO List */
-//P0: Log in
 //P1: Yell and scream if number of groups is < number of users or devices (until this means something)
 //P1: Yell and scream if number of devices != number of users (until this means something)
 //P1: Report errors
 //P2: Create devices and attach to existing groups. Confirm with user that numDevices should be attached to numGroups (especially if numGroups < numDevices)
 //P2: Allow script to configure your environment OR create some data
 //P2: Only create devices, or groups, or users (and attach them to existing)
+//P3: Write test functions
 //P3: Batch
 //P3: async/await
 //P4: Progress Bar
