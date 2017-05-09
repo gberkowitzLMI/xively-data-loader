@@ -34,7 +34,7 @@ var createUserBody = function(userConfig){
         },
         "accountId": accountId,
         "endUserTemplateId": userConfig.templateId,
-        "organizationId": linkToGroup(upTo)
+        "organizationId": linkToGroupSimple(upTo)
     }
 }
 
@@ -42,7 +42,7 @@ var createDeviceBody = function(deviceConfig,upTo){
 
     return {
         "accountId":accountId,
-        "organizationId": linkToGroup(upTo),
+        "organizationId": linkToGroupSimple(upTo),
         "serialNumber": createIncrementingName(deviceConfig.namePrefix),
         "deviceTemplateId": deviceConfig.templateId,
         "latitude": faker.address.latitude(),
@@ -76,17 +76,23 @@ var doLogin = function(username,password){
         "password":credentials.password,
         "accountId":accountId
     }
-    request.post("https://id.xively.com/api/v1/auth/login-user",body,function(req,res){
+    request.post({url:"https://id.xively.com/api/v1/auth/login-user",body:body, json:true},function(err,data){
+        console.log(err);
+        console.log(data.body);
         manage.defaults({headers: {'Authorization':"Bearer " +  res.body.jwt}}); 
     });
+}
+
+var linkToGroupSimple = function(upTo){
+    return groups[upTo-1];
 }
 
 /* Actual Process */
 var run = function(){
     doLogin(credentials.username,credentials.password); //It's been too long, can I count on this to be synchronous?
-    createXivelyObject(config.groups,createGroupBody,processGroupResponse);
-    createXivelyObject(config.devices,createDeviceBody);
-    createXivelyObject(config.users,createUserBody);
+    //createXivelyObject(config.groups,createGroupBody,processGroupResponse);
+    //createXivelyObject(config.devices,createDeviceBody);
+    //createXivelyObject(config.users,createUserBody);
 }
 
 run();
