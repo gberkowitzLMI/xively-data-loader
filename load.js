@@ -6,6 +6,7 @@ var accountId = config.accountId;
 var credentials = require('./credentials.js');
 var faker = require('faker/locale/en_US'); //For user data
 var groups = []; //This will probably need to be re-thought
+var deviceCount = 0;
 var authToken;
 
 /*
@@ -16,7 +17,7 @@ var authToken;
 
 var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn,terminator){
     var upTo = 0;
-    while(++upTo <= objectConfig.asManyAsINeed){ // <-- Pretty sure I heard that prepended incrementors are the sign of a maniac
+    while(++upTo <= objectConfig.asManyAsINeed){ // <-- Warning: Pretty sure I heard that prepended incrementors are the sign of a maniac
         var body = createBodyFn(objectConfig, upTo);
         manage.post({url:objectConfig.postURL,headers:{'authorization': authToken}, body:body}, function(err, data){
             if(typeof processResponseFn === "function") processResponseFn(objectConfig, data.body,upTo,terminator);
@@ -64,13 +65,14 @@ var createGroupBody = function(groupConfig, upTo){
 var processGroupResponse = function(groupConfig, groupResponse, upTo, terminator){
     //Do some error processing
     groups.push(groupResponse.organization.id);
-    if(upTo >= groupConfig.asManyAsINeed)
+    if(groups.length == groupConfig.asManyAsINeed)
         terminator();
 
 }
 
 var processDeviceResponse = function(deviceConfig,deviceResponse, upTo, terminator){
-    if(upTo >= deviceConfig.asManyAsINeed)
+    ++deviceCount; // <-- There it is again. Stand back this guy really is crazy!!
+    if(deviceCount == deviceConfig.asManyAsINeed)
         terminator();
 }
 
