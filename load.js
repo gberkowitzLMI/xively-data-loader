@@ -18,7 +18,6 @@ var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn,ca
     while(++upTo <= objectConfig.asManyAsINeed){ // <-- Pretty sure I heard that prepended incrementors are the sign of a maniac
         var body = createBodyFn(objectConfig, upTo);
         manage.post({url:objectConfig.postURL,headers:{'authorization': authToken}, body:body}, function(err, data){
-            console.log(data.body);
             if(typeof processResponseFn === "function") processResponseFn(data.body);
         });
     }
@@ -42,10 +41,12 @@ var createUserBody = function(userConfig,upTo){
 }
 
 var createDeviceBody = function(deviceConfig,upTo){
+    var group = linkToGroupSimple(upTo);
+    console.log(group);
     return {
         "accountId":accountId,
-        "organizationId": linkToGroupSimple(upTo),
-        "serialNumber": createIncrementingName(deviceConfig.namePrefix),
+        "organizationId": group,
+        "serialNumber": createIncrementingName(deviceConfig.namePrefix, upTo),
         "deviceTemplateId": deviceConfig.templateId,
         "latitude": faker.address.latitude(),
         "longitude": faker.address.longitude(),
@@ -64,7 +65,6 @@ var createGroupBody = function(groupConfig, upTo){
 /* Response Processors */
 var processGroupResponse = function(groupResponse){
     //Do some error processing
-    console.log(groupResponse.organization.id);
     groups.push(groupResponse.organization.id);
 }
 
@@ -86,7 +86,6 @@ var doLogin = function(username,password, callback){
 }
 
 var linkToGroupSimple = function(upTo){
-    console.log(groups);
     return groups[upTo-1];
 }
 
@@ -94,9 +93,9 @@ var linkToGroupSimple = function(upTo){
 var run = function(){
     doLogin(credentials.username,credentials.password,function(){ //There's GOT to be a better way!
         createXivelyObject(config.groups,createGroupBody,processGroupResponse,function(){
-            //createXivelyObject(config.devices,createDeviceBody,null,function(){
-              //  createXivelyObject(config.users,createUserBody,null,function(){}); //yes I know
-           // });
+            createXivelyObject(config.devices,createDeviceBody,null,function(){
+                createXivelyObject(config.users,createUserBody,null,function(){}); //yes I know
+            });
         });
     }); 
 }
