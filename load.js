@@ -102,7 +102,6 @@ var run = function(){
     async.series([
         function(callback){
             doLogin(credentials.username,credentials.password,callback);
-
         },
         function(callback){
             createXivelyObject(config.groups, createGroupBody, processGroupResponse, callback);
@@ -121,7 +120,8 @@ run();
 
 
 /* TODO List */
-//P0: What's the preferred way to not have stupid callbacks?
+//P0: Don't use incremental name generators
+//P0: Handle collision errors
 //P1: Delete all data from an account. Keep this in a separate script.
 //P1: Yell and scream if number of groups is < number of users or devices (until this means something)
 //P1: Yell and scream if number of devices != number of users (until this means something)
