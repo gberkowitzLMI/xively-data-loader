@@ -6,28 +6,33 @@ var accountId = config.accountId;
 var credentials = require('./credentials.js');
 var faker = require('faker/locale/en_US'); //For user data
 var groups = []; //This will probably need to be re-thought
-var deviceCount = 0;
 var authToken;
 
-/*
-    Process idea: create orgs first and save ids. Use ratio of orgs:devices:users to associate while creating
-    devices + users. I believe when upTo % ratio = 0, pop the next orgId off the array. Will become more complex
-    to do nested orgs, but not much I think. Probably only works for ratio > 1.
-*/
+
+// var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn,terminator){
+//     objectConfig.count = 0;
+//     while(objectConfig.count <= objectConfig.asManyAsINeed){
+//         var body = createBodyFn(objectConfig);
+//         manage.post({url:objectConfig.postURL,headers:{'authorization': authToken}, body:body}, function(err, data){
+//             if(typeof processResponseFn === "function" && data.body) 
+//                 processResponseFn(objectConfig, data.body, terminator);
+//         });
+//     }
+// }
 
 var createXivelyObject = function(objectConfig,createBodyFn,processResponseFn,terminator){
-    var upTo = 0;
-    while(++upTo <= objectConfig.asManyAsINeed){ // <-- Warning: Pretty sure I heard that prepended incrementors are the sign of a maniac
-        var body = createBodyFn(objectConfig, upTo);
-        manage.post({url:objectConfig.postURL,headers:{'authorization': authToken}, body:body}, function(err, data){
-            if(typeof processResponseFn === "function") processResponseFn(objectConfig, data.body,upTo,terminator);
-        });
-    }
+    var body = createBodyFn(objectConfig);
+    manage.post({url:objectConfig.postURL,headers:{'authorization': authToken}, body:body}, function(err, data){
+        if(typeof processResponseFn === "function" && data.body) 
+            processResponseFn(objectConfig, data.body, terminator, function(){
+                createXivelyObject(objectConfig,createBodyFn,processResponseFn,terminator);
+            });
+    });
 }
 
 
 /* Body Generators */
-var createUserBody = function(userConfig,upTo){
+var createUserBody = function(userConfig){
     return {
         "createIdmUser":userConfig.createIdmUser, //Not parsing for bad data atm
         "idmUserEmail": faker.internet.exampleEmail(),
@@ -37,48 +42,74 @@ var createUserBody = function(userConfig,upTo){
         },
         "accountId": accountId,
         "endUserTemplateId": userConfig.templateId,
-        "organizationId": linkToGroupSimple(upTo)
+        "organizationId": linkToGroupSimple(userConfig.count)
     }
 }
 
-var createDeviceBody = function(deviceConfig,upTo){
+var createDeviceBody = function(deviceConfig){
     return {
         "accountId":accountId,
-        "organizationId": linkToGroupSimple(upTo),
-        "serialNumber": createIncrementingName(deviceConfig.namePrefix, upTo),
+        "organizationId": linkToGroupSimple(deviceConfig.count),
+        "serialNumber": createNameWithSuffix(deviceConfig.namePrefix),
         "deviceTemplateId": deviceConfig.templateId,
         "latitude": faker.address.latitude(),
         "longitude": faker.address.longitude(),
     }
 }
 
-var createGroupBody = function(groupConfig, upTo){
+var createGroupBody = function(groupConfig){
     return {
         "accountId":accountId,
-        "name": createIncrementingName(groupConfig.namePrefix,upTo),
+        "name": createNameWithSuffix(groupConfig.namePrefix),
         "organizationTemplateId": groupConfig.templateId
     }
 }
 
 
 /* Response Processors */
-var processGroupResponse = function(groupConfig, groupResponse, upTo, terminator){
-    //Do some error processing
-    groups.push(groupResponse.organization.id);
-    if(groups.length == groupConfig.asManyAsINeed)
-        terminator();
-
+var processGroupResponse = function(groupConfig, groupResponse, terminator,repeater){
+    //If at first you don't succeed...
+    if(!groupResponse.error){
+        groups.push(groupResponse.organization.id);
+        ++groupConfig.count;
+        if(groups.length == groupConfig.asManyAsINeed){
+            terminator();
+        }
+            
+        else
+            repeater();
+    }
+    
 }
 
-var processDeviceResponse = function(deviceConfig,deviceResponse, upTo, terminator){
-    ++deviceCount; // <-- There it is again. Stand back this guy really is crazy!!
-    if(deviceCount == deviceConfig.asManyAsINeed)
-        terminator();
+var processDeviceResponse = function(deviceConfig,deviceResponse, terminator, repeater){
+    if(!deviceResponse.error){
+        ++deviceConfig.count; 
+        if(deviceConfig.count == deviceConfig.asManyAsINeed)
+            terminator();
+        else
+            repeater();
+    }
+}
+
+var processUserResponse = function(userConfig,userResponse, terminator, repeater){
+    if(!userResponse.error){
+        ++userConfig.count; 
+        if(userConfig.count == userConfig.asManyAsINeed)
+            terminator();
+        else
+            repeater();
+    }
 }
 
 /* Additional Helper Functions */
-var createIncrementingName = function(namePrefix, num){
-    return namePrefix + num;
+var createNameWithSuffix = function(namePrefix){
+    return namePrefix + getRandomArbitrary(100000,9999999);
+}
+
+    //https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/random
+function getRandomArbitrary(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
 }
 
 var doLogin = function(username,password, terminator){
@@ -94,11 +125,14 @@ var doLogin = function(username,password, terminator){
 }
 
 var linkToGroupSimple = function(upTo){
-    return groups[upTo-1];
+    return groups[upTo];
 }
 
 /* Actual Process */
 var run = function(){
+    config.groups.count = 0;
+    config.devices.count = 0;
+    config.users.count =0;
     async.series([
         function(callback){
             doLogin(credentials.username,credentials.password,callback);
@@ -110,7 +144,7 @@ var run = function(){
             createXivelyObject(config.devices,createDeviceBody, processDeviceResponse, callback);
         },
         function(callback){
-            createXivelyObject(config.users,createUserBody);
+            createXivelyObject(config.users,createUserBody,processUserResponse, callback);
         }
         
     ]);
